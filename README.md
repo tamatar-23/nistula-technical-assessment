@@ -276,6 +276,28 @@ Temperature is set to `0.2` to keep replies consistent and operationally safe.
 
 ---
 
+## 3am Scenario — Thinking Process
+
+Full written answers are in [`thinking.md`](thinking.md). Summary:
+
+- **Immediate response** — lead with empathy and a concrete next step (on-call manager contacted, refund noted), without promising anything the AI can't authorise.
+- **System design** — classify as emergency complaint, create an incident, push-notify the on-call team, lock the conversation into agent-review mode. If no one acknowledges within 30 minutes, auto-escalate with a phone call.
+- **Pattern detection** — three hot water complaints at the same villa in two months is a pattern. Build a recurring-issue detector, require root-cause notes on maintenance tickets, and add a pre-arrival plumbing check so the fourth complaint never happens.
+
+---
+
+## Schema Design Highlights
+
+Full schema with inline comments is in [`schema.sql`](schema.sql). Key decisions:
+
+- **Channel-independent guests** — a single `guests` row per person, with `guest_channel_identities` mapping WhatsApp numbers, Airbnb IDs, etc. back to that one record. No duplicate profiles.
+- **One `messages` table for all channels and directions** — `query_type` and `ai_confidence_score` sit directly on the message row so dashboards can filter and sort without joins.
+- **Separate `ai_drafts` table** — a single inbound message can trigger multiple draft attempts (retries, prompt tweaks, agent overrides). Storing drafts separately preserves the full audit trail for model-quality analysis. This was the hardest trade-off: inline fields for fast reads vs. a separate table for history. The hybrid approach (classification inline, draft text separate) balances both.
+- **`handling_status` lifecycle enum** — `received → ai_drafted → auto_sent / agent_edited → sent / escalated / failed` gives ops teams a clear pipeline view of every message.
+- **Nullable `reservation_id`** — pre-sales conversations happen before any booking exists; once the guest books, the conversation is linked.
+
+---
+
 ## Design Decisions
 
 1. **Rule-based classification** — transparent and easy to review. Every classification can be traced back to the keyword that triggered it.
