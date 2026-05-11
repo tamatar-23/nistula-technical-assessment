@@ -1,0 +1,109 @@
+================================================================================
+NISTULA TECHNICAL ASSESSMENT — TEST RESULTS
+================================================================================
+
+Test environment:
+  Python 3.12.3 | FastAPI 0.115.6 | pytest 9.0.3
+  Model: claude-sonnet-4-20250514
+  Date: 2026-05-11
+
+================================================================================
+SECTION 1: UNIT TESTS (pytest, mock mode)
+================================================================================
+
+$ pytest tests/ -v
+
+tests/test_webhook.py::test_availability_query_auto_sends PASSED         [  6%]
+tests/test_webhook.py::test_pricing_query_is_classified PASSED           [ 12%]
+tests/test_webhook.py::test_checkin_query_is_classified PASSED           [ 18%]
+tests/test_webhook.py::test_special_request_is_classified PASSED         [ 25%]
+tests/test_webhook.py::test_complaint_is_escalated PASSED                [ 31%]
+tests/test_webhook.py::test_general_enquiry_fallback PASSED              [ 37%]
+tests/test_webhook.py::test_high_confidence_with_full_context PASSED     [ 43%]
+tests/test_webhook.py::test_lower_confidence_without_booking_ref PASSED  [ 50%]
+tests/test_webhook.py::test_response_contains_all_required_fields PASSED [ 56%]
+tests/test_webhook.py::test_message_id_is_valid_uuid PASSED              [ 62%]
+tests/test_webhook.py::test_invalid_source_returns_422 PASSED            [ 68%]
+tests/test_webhook.py::test_empty_message_returns_422 PASSED             [ 75%]
+tests/test_webhook.py::test_missing_guest_name_returns_422 PASSED        [ 81%]
+tests/test_webhook.py::test_missing_property_id_returns_422 PASSED       [ 87%]
+tests/test_webhook.py::test_all_valid_sources_are_accepted PASSED        [ 93%]
+tests/test_webhook.py::test_health_endpoint PASSED                       [100%]
+
+16 passed in 0.67s
+
+================================================================================
+SECTION 2: LIVE API TESTS (Claude API, USE_MOCK_CLAUDE=false)
+================================================================================
+
+--- Test 1: Pre-sales availability + pricing (WhatsApp) -----------------------
+
+REQUEST:
+POST /webhook/message
+{
+  "source": "whatsapp",
+  "guest_name": "Rahul Sharma",
+  "message": "Is the villa available from April 20 to 24? What is the rate for 2 adults?",
+  "timestamp": "2026-05-05T10:30:00Z",
+  "booking_ref": "NIS-2024-0891",
+  "property_id": "villa-b1"
+}
+
+RESPONSE:
+{
+  "message_id": "9a4038f2-614a-4a35-9214-4e011ad75df9",
+  "query_type": "pre_sales_availability",
+  "drafted_reply": "Hi Rahul!\n\nGreat news - Villa B1 in Assagao is available from April 20-24!\n\nFor 2 adults, the rate is INR 18,000 per night (our base rate covers up to 4 guests, so you're all set). You'll have the entire 3-bedroom villa with private pool to yourselves.\n\nQuick details:\n- Check-in: 2pm | Check-out: 11am\n- Caretaker available 8am-10pm\n- Chef services available with pre-booking\n\nThe total for 4 nights would be INR 72,000. Would you like me to proceed with the booking? Happy to answer any other questions!\n\nBest regards,\nNistula Guest Team",
+  "confidence_score": 0.93,
+  "action": "auto_send"
+}
+
+VERDICT: ✓ Correct classification, correct rate, high confidence, auto-sent.
+
+--- Test 2: Post-sales check-in + WiFi (Booking.com) --------------------------
+
+REQUEST:
+POST /webhook/message
+{
+  "source": "booking_com",
+  "guest_name": "Priya Menon",
+  "message": "What time can we check in and what is the WiFi password?",
+  "timestamp": "2026-05-06T14:00:00Z",
+  "booking_ref": "NIS-2024-1102",
+  "property_id": "villa-b1"
+}
+
+RESPONSE:
+{
+  "message_id": "cff0b82d-f88d-4ac6-bb7f-8b94399a5e29",
+  "query_type": "post_sales_checkin",
+  "drafted_reply": "Hi Priya,\n\nWelcome to Villa B1! We're excited to have you stay with us in Assagao.\n\nCheck-in is at 2pm, and you can check out at 11am. The WiFi password is: Nistula@2024\n\nOur caretaker will be available from 8am to 10pm during your stay to assist with anything you need. If you'd like to arrange our chef service, please let us know in advance so we can organize that for you.\n\nLooking forward to hosting you at Villa B1!\n\nBest regards,\nNistula Guest Team",
+  "confidence_score": 0.97,
+  "action": "auto_send"
+}
+
+VERDICT: ✓ Correct classification, correct check-in time and WiFi password, auto-sent.
+
+--- Test 3: Complaint + refund demand at 3am (WhatsApp) ------------------------
+
+REQUEST:
+POST /webhook/message
+{
+  "source": "whatsapp",
+  "guest_name": "Amit Patel",
+  "message": "There is no hot water and we have guests arriving for breakfast in 4 hours. This is unacceptable. I want a refund for tonight.",
+  "timestamp": "2026-05-07T03:00:00Z",
+  "booking_ref": "NIS-2024-0891",
+  "property_id": "villa-b1"
+}
+
+RESPONSE:
+{
+  "message_id": "72622d93-d953-4ebb-beaa-0150b248eeb4",
+  "query_type": "complaint",
+  "drafted_reply": "Hi Amit,\n\nI sincerely apologize for the hot water issue at Villa B1 - this is completely unacceptable, especially with your breakfast guests arriving soon. I understand how frustrating this must be.\n\nI'm immediately escalating this to our operations team as an emergency. They'll coordinate with the caretaker to resolve the hot water problem urgently and ensure everything is working before your guests arrive.\n\nRegarding your refund request for tonight, our team will review this as part of the escalation and get back to you promptly with a resolution.\n\nThank you for your patience during this inconvenience. We're committed to making this right.\n\nBest regards,\nNistula Guest Services Team",
+  "confidence_score": 0.55,
+  "action": "escalate"
+}
+
+VERDICT: ✓ Classified as complaint, confidence capped at 0.55, escalated. Reply is empathetic, does not promise a refund.
